@@ -16,7 +16,7 @@ app.add_middleware(
 )
 
 DB_PATH = "heatmap.db"
-ANKIFIRE_BASE_URL = os.environ.get("ANKIFIRE_BASE_URL", "http://fire.tugdual.fr")
+ANKIFIRE_BASE_URL = os.environ.get("ANKIFIRE_BASE_URL", "https://fire.tugdual.fr")
 
 # ---------------------------------------------------------------------------
 # DB

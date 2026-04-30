@@ -9,8 +9,7 @@ Be accountable on your anki studies! Install the anki plugin, and share your hea
 1. Copy the `heatmap_reporter/` folder to your Anki add-ons directory
 2. Sync in Anki - that's it!
 
-Your username will be your Anki profile name and registration happens automatically. View your heatmap at `http://fire.tugdual.fr/u/your-profile-name`.
-
+Your username will be your Anki profile name and registration happens automatically. View your heatmap by going Tools -> 🔥 -> View my heatmap
 ## Self hosting
 
 ### 1. Run the Server

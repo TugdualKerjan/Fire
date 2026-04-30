@@ -1,0 +1,8 @@
+{
+    "name": "Heatmap Reporter",
+    "package": "heatmap_reporter",
+    "author": "tugdual",
+    "description": "Phones home review history to fire.tugdual.fr on every AnkiWeb sync.",
+    "homepage": "https://fire.tugdual.fr",
+    "min_point_version": 50
+}

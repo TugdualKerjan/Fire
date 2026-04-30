@@ -1,0 +1,14 @@
+{
+  "properties": {
+    "token": {
+      "description": "Your Bearer token from fire.tugdual.fr/api/register",
+      "title": "Token",
+      "type": "string"
+    }
+  },
+  "required": [
+    "token"
+  ],
+  "title": "Heatmap Reporter",
+  "type": "object"
+}

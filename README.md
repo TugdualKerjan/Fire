@@ -4,16 +4,12 @@
 
 Be accountable on your anki studies! Install the anki plugin, and share your heatmap with anyone. Fully open-source.
 
-## Register
-
-```bash
-curl -X POST http://fire.tugdual.fr/api/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "YOUR DESIRED USERNAME"}'
-```
+## Quick Setup
 
 1. Copy the `heatmap_reporter/` folder to your Anki add-ons directory
-2. In Anki: Tools → Add-ons → Heatmap Reporter → Config add your token.
+2. Sync in Anki - that's it!
+
+Your username will be your Anki profile name and registration happens automatically. View your heatmap at `http://fire.tugdual.fr/u/your-profile-name`.
 
 ## Self hosting
 
@@ -29,22 +25,13 @@ uv run uvicorn server:app --host 0.0.0.0 --port 8000
 ### 2. Install the Anki Add-on
 
 1. Copy the `heatmap_reporter/` folder to your Anki add-ons directory
-2. In Anki: Tools → Add-ons → Heatmap Reporter.
-3. Configure your server URL (default: `ANKIFIRE_BASE_URL`)
+2. In Anki: Tools → Add-ons → Heatmap Reporter → Config
+3. Set `base_url` to your server URL (e.g., `https://your-domain.com`)
+4. Sync in Anki
 
-### 3. Register and Get Token
+### 3. View Your Heatmap
 
-```bash
-curl -X POST http://ANKIFIRE_BASE_URL/api/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "your-username"}'
-```
-
-Copy the returned token to your Anki add-on config.
-
-### 4. View Your Heatmap
-
-Visit `http://ANKIFIRE_BASE_URL/u/your-username` to see your review heatmap.
+Visit `http://ANKIFIRE_BASE_URL/u/your-profile-name` to see your review heatmap.
 
 
 

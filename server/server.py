@@ -123,6 +123,19 @@ def register(payload: RegisterPayload):
     }
 
 
+class AutoRegisterPayload(BaseModel):
+    username: str
+    reviews: list[ReviewEntry]
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not USERNAME_RE.match(v):
+            raise ValueError("Username must be 2-32 chars, lowercase letters/digits/- only")
+        return v
+
+
 @app.post("/api/reviews")
 def post_reviews(
     payload: BulkReviewPayload,
@@ -143,6 +156,44 @@ def post_reviews(
             [(username, r.date, r.count) for r in payload.reviews]
         )
     return {"ok": True, "upserted": len(payload.reviews)}
+
+
+@app.post("/api/auto-register")
+def auto_register(payload: AutoRegisterPayload):
+    """
+    Auto-registration from Anki add-on. Creates user if doesn't exist,
+    uploads reviews, and returns token for future requests.
+    """
+    with get_db() as db:
+        existing = db.execute(
+            "SELECT token FROM users WHERE username = ?", (payload.username,)
+        ).fetchone()
+
+        if existing:
+            token = existing["token"]
+        else:
+            token = secrets.token_hex(32)
+            db.execute(
+                "INSERT INTO users (username, token, created_at) VALUES (?, ?, ?)",
+                (payload.username, token, datetime.date.today().isoformat())
+            )
+
+        if payload.reviews:
+            db.executemany(
+                """
+                INSERT INTO reviews (username, date, count)
+                VALUES (?, ?, ?)
+                ON CONFLICT(username, date) DO UPDATE SET count = excluded.count
+                """,
+                [(payload.username, r.date, r.count) for r in payload.reviews]
+            )
+
+    return {
+        "username": payload.username,
+        "token": token,
+        "heatmap_url": f"{ANKIFIRE_BASE_URL}/u/{payload.username}",
+        "upserted": len(payload.reviews)
+    }
 
 
 @app.get("/u/{username}.json")

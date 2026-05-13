@@ -12,7 +12,7 @@ import hashlib
 
 from aqt.qt import QAction
 from aqt import gui_hooks, mw
-from aqt.utils import tooltip
+from aqt.utils import tooltip, getText
 
 
 def get_username() -> str:
@@ -182,22 +182,106 @@ def try_register():
         mw.taskman.run_on_main(
             lambda: tooltip("❌ Unexpected response from server", period=5000)
         )
+
+def update_username():
+    """Prompt user for display name and update on server."""
+    # Get current username
+    username = get_username()
+    
+    # Prompt for new display name
+    display_name, accepted = getText(
+        f"Your hashed username is: {username}\n\nEnter a display name (1-32 chars, letters/numbers/underscore/dash only):",
+        mw,
+        title="Update Display Name"
+    )
+    
+    if not accepted or not display_name:
+        return
+    
+    display_name = display_name.strip()
+    
+    # Start update in background thread
+    def do_update():
+        base_url = get_base_url()
+        token = get_stored_token()
+        
+        if not token:
+            mw.taskman.run_on_main(
+                lambda: tooltip("❌ Not registered. Please sync first.", period=4000)
+            )
+            return
+        
+        api_url = f"{base_url}/api/update-display-name"
+        payload = json.dumps({"display_name": display_name}).encode("utf-8")
+        
+        req = urllib.request.Request(
+            api_url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
+            method="POST",
+        )
+        
+        try:
+            with urllib.request.urlopen(req, timeout=15) as response:
+                mw.taskman.run_on_main(
+                    lambda: tooltip(f"✅ Display name updated to '{display_name}'", period=4000)
+                )
+        except urllib.error.HTTPError as e:
+            code = e.code
+            try:
+                error_msg = e.read().decode("utf-8")
+                data = json.loads(error_msg)
+                detail = data.get("detail", f"HTTP {code}")
+            except:
+                detail = f"HTTP {code}"
+            mw.taskman.run_on_main(
+                lambda: tooltip(f"❌ Update failed: {detail}", period=5000)
+            )
+        except (urllib.error.URLError, OSError) as e:
+            msg = str(e)
+            mw.taskman.run_on_main(
+                lambda: tooltip(f"❌ Could not reach server: {msg}", period=5000)
+            )
+    
+    threading.Thread(target=do_update, daemon=True).start()
+
+def check_status():
+    """Show current registration status."""
+    username = get_username()
+    token = get_stored_token()
+    base_url = get_base_url()
+    
+    if not token:
+        tooltip(f"❌ Not registered.\n\nUsername: {username}\nToken: None\n\nPlease sync your collection or use 'Register / re-register'.", period=6000)
+    else:
+        token_preview = token[:20] + "..." if len(token) > 20 else token
+        tooltip(f"✅ Registered\n\nUsername: {username}\nToken: {token_preview}\nServer: {base_url}", period=6000)
+
 def add_menu_items():
-    menu = mw.form.menuTools.addMenu("🔥")
+    menu = mw.form.menuTools.addMenu("heatshare")
 
     view_action = QAction("View my heatmap", mw)
     view_action.triggered.connect(open_heatmap)
     menu.addAction(view_action)
 
-    # test_action = QAction("Test connection", mw)
-    # test_action.triggered.connect(test_connection)
-    # menu.addAction(test_action)
+    update_username_action = QAction("Update my username", mw)
+    update_username_action.triggered.connect(update_username)
+    menu.addAction(update_username_action)
 
-    # register_action = QAction("Register / re-register", mw)
-    # register_action.triggered.connect(
-    #     lambda: threading.Thread(target=try_register, daemon=True).start()
-    # )
-    # menu.addAction(register_action)
+    menu.addSeparator()
+
+    status_action = QAction("Check registration status", mw)
+    status_action.triggered.connect(check_status)
+    menu.addAction(status_action)
+
+    register_action = QAction("Register / re-register", mw)
+    register_action.triggered.connect(
+        lambda: threading.Thread(target=try_register, daemon=True).start()
+    )
+    menu.addAction(register_action)
 
 gui_hooks.main_window_did_init.append(add_menu_items)
 gui_hooks.sync_did_finish.append(on_sync_did_finish)

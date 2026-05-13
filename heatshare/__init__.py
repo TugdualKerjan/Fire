@@ -123,9 +123,10 @@ def on_sync_did_finish():
 def on_profile_loaded():
     base_url = get_base_url()
     username = get_username()
+    url = f"{base_url}/u/{username}"
 
     if base_url:
-        tooltip(f"🔥 Heatmap Reporter active as '{username}'", period=3000)
+        tooltip(f"Your heatmap is viewable at:<br><b>{url}</b>", period=5000)
     else:
         tooltip(
             "⚠️ Heatmap Reporter: no base_url configured.<br>"
@@ -139,49 +140,6 @@ def open_heatmap():
     url = f"{base_url}/u/{username}"
     webbrowser.open(url)
 
-def test_connection():
-    base_url = get_base_url()
-    api_url = f"{base_url}/api/health"
-    try:
-        with urllib.request.urlopen(api_url, timeout=5) as r:
-            tooltip(f"✅ Connected to {base_url}", period=3000)
-    except Exception as e:
-        tooltip(f"❌ Could not reach {base_url}: {e}", period=5000)
-def try_register():
-    base_url = get_base_url()
-    username = get_username()
-    reviews = fetch_all_reviews()
-    api_url = f"{base_url}/api/auto-register"
-    
-    payload = json.dumps({"username": username, "reviews": reviews}).encode("utf-8")
-    req = urllib.request.Request(
-        api_url,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as response:
-            raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            store_token(data["token"])
-            mw.taskman.run_on_main(
-                lambda: tooltip(f"✅ Registered as '{username}', token stored.", period=4000)
-            )
-    except urllib.error.HTTPError as e:
-        code = e.code
-        mw.taskman.run_on_main(
-            lambda: tooltip(f"❌ Registration failed: HTTP {code}", period=5000)
-        )
-    except (urllib.error.URLError, OSError) as e:
-        msg = str(e)
-        mw.taskman.run_on_main(
-            lambda: tooltip(f"❌ Could not reach server: {msg}", period=5000)
-        )
-    except (json.JSONDecodeError, KeyError) as e:
-        mw.taskman.run_on_main(
-            lambda: tooltip("❌ Unexpected response from server", period=5000)
-        )
 
 def update_username():
     """Prompt user for display name and update on server."""
@@ -211,7 +169,7 @@ def update_username():
             )
             return
         
-        api_url = f"{base_url}/api/update-display-name"
+        api_url = f"{base_url}/api/display-name"
         payload = json.dumps({"display_name": display_name}).encode("utf-8")
         
         req = urllib.request.Request(
@@ -221,7 +179,7 @@ def update_username():
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {token}",
             },
-            method="POST",
+            method="PUT",
         )
         
         try:
@@ -248,17 +206,6 @@ def update_username():
     
     threading.Thread(target=do_update, daemon=True).start()
 
-def check_status():
-    """Show current registration status."""
-    username = get_username()
-    token = get_stored_token()
-    base_url = get_base_url()
-    
-    if not token:
-        tooltip(f"❌ Not registered.\n\nUsername: {username}\nToken: None\n\nPlease sync your collection or use 'Register / re-register'.", period=6000)
-    else:
-        token_preview = token[:20] + "..." if len(token) > 20 else token
-        tooltip(f"✅ Registered\n\nUsername: {username}\nToken: {token_preview}\nServer: {base_url}", period=6000)
 
 def add_menu_items():
     menu = mw.form.menuTools.addMenu("heatshare")
@@ -270,19 +217,6 @@ def add_menu_items():
     update_username_action = QAction("Update my username", mw)
     update_username_action.triggered.connect(update_username)
     menu.addAction(update_username_action)
-
-    menu.addSeparator()
-
-    status_action = QAction("Check registration status", mw)
-    status_action.triggered.connect(check_status)
-    menu.addAction(status_action)
-
-    register_action = QAction("Register / re-register", mw)
-    register_action.triggered.connect(
-        lambda: threading.Thread(target=try_register, daemon=True).start()
-    )
-    menu.addAction(register_action)
-
 gui_hooks.main_window_did_init.append(add_menu_items)
 gui_hooks.sync_did_finish.append(on_sync_did_finish)
 gui_hooks.profile_did_open.append(on_profile_loaded)

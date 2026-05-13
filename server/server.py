@@ -77,28 +77,6 @@ def require_token(authorization: Annotated[str | None, Header()] = None) -> str:
 # Models
 # ---------------------------------------------------------------------------
 
-class RegisterPayload(BaseModel):
-    username: str
-    display_name: str | None = None
-
-    @field_validator("username")
-    @classmethod
-    def validate_username(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not USERNAME_RE.match(v):
-            raise ValueError("Username must be 2-32 chars, lowercase letters/digits/- only")
-        return v
-
-    @field_validator("display_name")
-    @classmethod
-    def validate_display_name(cls, v: str | None) -> str | None:
-        if v is None:
-            return None
-        v = v.strip()
-        if v and not USERNAME_RE.match(v):
-            raise ValueError("Display name must be 2-32 chars, lowercase letters/digits/- only")
-        return v if v else None
-
 class ReviewEntry(BaseModel):
     date: str   # YYYY-MM-DD
     count: int
@@ -109,31 +87,6 @@ class BulkReviewPayload(BaseModel):
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-
-@app.post("/api/register", status_code=201)
-def register(payload: RegisterPayload):
-    """
-    Self-registration. Returns a token to paste into the add-on config.
-    Username must be unique. Tokens are random 32-byte hex strings.
-    """
-    with get_db() as db:
-        existing = db.execute(
-            "SELECT 1 FROM users WHERE username = ?", (payload.username,)
-        ).fetchone()
-        if existing:
-            raise HTTPException(status_code=409, detail="Username already taken")
-        token = secrets.token_hex(32)
-        db.execute(
-            "INSERT INTO users (username, display_name, token, created_at) VALUES (?, ?, ?, ?)",
-            (payload.username, payload.display_name, token, datetime.date.today().isoformat())
-        )
-    return {
-        "username": payload.username,
-        "token": token,
-        "heatmap_url": f"{ANKIFIRE_BASE_URL}/u/{payload.username}",
-        "note": "Save this token — it won't be shown again."
-    }
-
 
 class AutoRegisterPayload(BaseModel):
     username: str

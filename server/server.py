@@ -6,7 +6,7 @@ import sqlite3, os, datetime, secrets, json, re
 from contextlib import contextmanager
 from typing import Annotated
 
-app = FastAPI(title="Anki Heatmap Service")
+app = FastAPI(title="Anki heatshare Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -16,7 +16,7 @@ app.add_middleware(
 )
 
 DB_PATH = "heatmap.db"
-ANKIFIRE_BASE_URL = os.environ.get("ANKIFIRE_BASE_URL", "https://fire.tugdual.fr")
+ANKIFIRE_BASE_URL = os.environ.get("ANKIFIRE_BASE_URL", "https://heatshare.tugdual.fr")
 
 # ---------------------------------------------------------------------------
 # DB
@@ -349,12 +349,26 @@ def render_heatmap(username, data_json, total_reviews, total_days, max_count, st
     --c3: #6b50d4; --c4: #7c6af7; --c5: #a78bfa;
     --cell: 13px; --gap: 3px; --radius: 3px;
   }}
+  [data-theme="light"] {{
+--bg:      #f5f5f7; --surface: #ffffff; --border: #d1d5db;
+--text:    #111827; --muted:   #6b7280;
+--accent:  #6d56f0; --accent2: #7c6af7;
+--c0: #e5e7eb; --c1: #c4b5fd; --c2: #a78bfa;
+--c3: #7c6af7; --c4: #6d56f0; --c5: #4c35d4;
+}}
+.theme-btn {{
+margin-left: auto; background: none; border: 1px solid var(--border);
+color: var(--muted); border-radius: 4px; padding: 2px 10px;
+cursor: pointer; font-family: 'DM Mono', monospace; font-size: 11px;
+transition: border-color .15s, color .15s;
+}}
+.theme-btn:hover {{ border-color: var(--accent); color: var(--accent2); }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{ background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif;
     font-size: 14px; min-height: 100vh; display: flex; align-items: center;
     justify-content: center; padding: 2rem; }}
   .card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 2rem 2.5rem; max-width: 900px; width: 100%; box-shadow: 0 4px 40px rgba(0,0,0,0.4); }}
+    padding: 2rem 2.5rem; max-width: 900px; width: 100%; box-shadow: var(--shadow, 0 4px 40px rgba(0,0,0,0.4)); }}
   .header {{ display: flex; align-items: baseline; gap: .75rem; margin-bottom: 1.75rem; }}
   .username {{ font-family: 'DM Mono', monospace; font-size: 1.1rem; color: var(--accent2); font-weight: 500; }}
   .label {{ color: var(--muted); font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }}
@@ -390,7 +404,7 @@ def render_heatmap(username, data_json, total_reviews, total_days, max_count, st
   .legend {{ display: flex; align-items: center; gap: 4px; margin-top: 1rem; justify-content: flex-end; }}
   .legend-label {{ font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); }}
   .legend .cell {{ cursor: default; }} .legend .cell:hover {{ transform: none; outline: none; }}
-  .tooltip {{ position: fixed; background: #1e2028; border: 1px solid var(--border); border-radius: 6px;
+  .tooltip {{ position: fixed; background:var(--surface); border: 1px solid var(--border); border-radius: 6px;
     padding: 6px 10px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text);
     pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 100; white-space: nowrap; }}
   .embed-hint {{ margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);
@@ -403,6 +417,7 @@ def render_heatmap(username, data_json, total_reviews, total_days, max_count, st
   <div class="header">
     <span class="username">{username}</span>
     <span class="label">· anki review history</span>
+    <button class="theme-btn" id="theme-toggle">☀ light</button>
   </div>
   <div class="stats">
     <div class="stat"><span class="stat-value">{total_reviews:,}</span><span class="stat-label">Total Reviews</span></div>
@@ -505,6 +520,16 @@ function moveTip(e) {{
 }}
 document.getElementById('btn-prev').onclick = () => render(--currentYear);
 document.getElementById('btn-next').onclick = () => {{ if (currentYear < today.getFullYear()) render(++currentYear); }};
+const root = document.documentElement;
+const themeBtn = document.getElementById('theme-toggle');
+const saved = localStorage.getItem('fire-theme');
+if (saved) {{ root.setAttribute('data-theme', saved); themeBtn.textContent = saved === 'light' ? '☾ dark' : '☀ light'; }}
+themeBtn.onclick = () => {{
+  const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  root.setAttribute('data-theme', next);
+  localStorage.setItem('fire-theme', next);
+  themeBtn.textContent = next === 'light' ? '☾ dark' : '☀ light';
+}};
 render(currentYear);
 </script>
 </body>

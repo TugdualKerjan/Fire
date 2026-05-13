@@ -1,7 +1,7 @@
 {
   "properties": {
     "token": {
-      "description": "Your Bearer token from fire.tugdual.fr/api/register",
+      "description": "Your Bearer token from heatshare.tugdual.fr/api/register",
       "title": "Token",
       "type": "string"
     }
@@ -9,6 +9,6 @@
   "required": [
     "token"
   ],
-  "title": "Heatmap Reporter",
+  "title": "heatshare",
   "type": "object"
 }

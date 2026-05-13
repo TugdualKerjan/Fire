@@ -1,0 +1,8 @@
+{
+    "name": "heatshare",
+    "package": "heatshare",
+    "author": "Tugdual Kerjan",
+    "description": "Share your review heatmap with anyone, embeddable, with heatshare.tugdual.fr/u/username on every AnkiWeb sync.",
+    "homepage": "https://heatshare.tugdual.fr",
+    "min_point_version": 50
+}

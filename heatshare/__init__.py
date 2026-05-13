@@ -36,7 +36,7 @@ def store_token(token: str):
 
 
 def get_base_url() -> str:
-    return get_config().get("base_url", "https://fire.tugdual.fr").strip().rstrip("/")
+    return get_config().get("base_url", "https://heatshare.tugdual.fr").strip().rstrip("/")
 
 
 def fetch_all_reviews() -> list[dict]:

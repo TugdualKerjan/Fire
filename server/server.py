@@ -26,9 +26,10 @@ def init_db():
     with get_db() as db:
         db.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                username   TEXT PRIMARY KEY,
-                token      TEXT NOT NULL UNIQUE,
-                created_at TEXT NOT NULL
+                username    TEXT PRIMARY KEY,
+                display_name TEXT,
+                token       TEXT NOT NULL UNIQUE,
+                created_at  TEXT NOT NULL
             )
         """)
         db.execute("""
@@ -78,6 +79,7 @@ def require_token(authorization: Annotated[str | None, Header()] = None) -> str:
 
 class RegisterPayload(BaseModel):
     username: str
+    display_name: str | None = None
 
     @field_validator("username")
     @classmethod
@@ -86,6 +88,16 @@ class RegisterPayload(BaseModel):
         if not USERNAME_RE.match(v):
             raise ValueError("Username must be 2-32 chars, lowercase letters/digits/- only")
         return v
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if v and not USERNAME_RE.match(v):
+            raise ValueError("Display name must be 2-32 chars, lowercase letters/digits/- only")
+        return v if v else None
 
 class ReviewEntry(BaseModel):
     date: str   # YYYY-MM-DD
@@ -112,8 +124,8 @@ def register(payload: RegisterPayload):
             raise HTTPException(status_code=409, detail="Username already taken")
         token = secrets.token_hex(32)
         db.execute(
-            "INSERT INTO users (username, token, created_at) VALUES (?, ?, ?)",
-            (payload.username, token, datetime.date.today().isoformat())
+            "INSERT INTO users (username, display_name, token, created_at) VALUES (?, ?, ?, ?)",
+            (payload.username, payload.display_name, token, datetime.date.today().isoformat())
         )
     return {
         "username": payload.username,
@@ -125,6 +137,7 @@ def register(payload: RegisterPayload):
 
 class AutoRegisterPayload(BaseModel):
     username: str
+    display_name: str | None = None
     reviews: list[ReviewEntry]
 
     @field_validator("username")
@@ -133,6 +146,28 @@ class AutoRegisterPayload(BaseModel):
         v = v.strip().lower()
         if not USERNAME_RE.match(v):
             raise ValueError("Username must be 2-32 chars, lowercase letters/digits/- only")
+        return v
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if v and not USERNAME_RE.match(v):
+            raise ValueError("Display name must be 2-32 chars, lowercase letters/digits/- only")
+        return v if v else None
+
+
+class UpdateDisplayNamePayload(BaseModel):
+    display_name: str
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not USERNAME_RE.match(v):
+            raise ValueError("Display name must be 2-32 chars, lowercase letters/digits/- only")
         return v
 
 
@@ -158,6 +193,33 @@ def post_reviews(
     return {"ok": True, "upserted": len(payload.reviews)}
 
 
+@app.put("/api/display-name")
+def update_display_name(
+    payload: UpdateDisplayNamePayload,
+    username: str = Depends(require_token),
+):
+    """
+    Update the display name for the authenticated user.
+    """
+    with get_db() as db:
+        # Check if display name is already taken by another user
+        existing = db.execute(
+            "SELECT username FROM users WHERE display_name = ? AND username != ?",
+            (payload.display_name, username)
+        ).fetchone()
+
+        if existing:
+            raise HTTPException(status_code=409, detail="Display name already taken")
+
+        # Update the display name
+        db.execute(
+            "UPDATE users SET display_name = ? WHERE username = ?",
+            (payload.display_name, username)
+        )
+
+    return {"ok": True, "display_name": payload.display_name}
+
+
 @app.post("/api/auto-register")
 def auto_register(payload: AutoRegisterPayload):
     """
@@ -171,11 +233,17 @@ def auto_register(payload: AutoRegisterPayload):
 
         if existing:
             token = existing["token"]
+            # Update display name if provided
+            if payload.display_name:
+                db.execute(
+                    "UPDATE users SET display_name = ? WHERE username = ?",
+                    (payload.display_name, payload.username)
+                )
         else:
             token = secrets.token_hex(32)
             db.execute(
-                "INSERT INTO users (username, token, created_at) VALUES (?, ?, ?)",
-                (payload.username, token, datetime.date.today().isoformat())
+                "INSERT INTO users (username, display_name, token, created_at) VALUES (?, ?, ?, ?)",
+                (payload.username, payload.display_name, token, datetime.date.today().isoformat())
             )
 
         if payload.reviews:
@@ -200,27 +268,47 @@ def auto_register(payload: AutoRegisterPayload):
 def get_reviews_json(username: str):
     """Raw review data — useful for custom embedding."""
     with get_db() as db:
+        # Check if it's a display name first
+        user_row = db.execute(
+            "SELECT username, display_name FROM users WHERE display_name = ? OR username = ?",
+            (username, username)
+        ).fetchone()
+
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        actual_username = user_row["username"]
+        display_name = user_row["display_name"] or actual_username
+
         rows = db.execute(
             "SELECT date, count FROM reviews WHERE username = ? ORDER BY date",
-            (username,)
+            (actual_username,)
         ).fetchall()
+
     if not rows:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"username": username, "reviews": [dict(r) for r in rows]}
+    return {"username": display_name, "reviews": [dict(r) for r in rows]}
 
 
 @app.get("/u/{username}", response_class=HTMLResponse)
 def get_heatmap(username: str):
     """Interactive embeddable heatmap page."""
     with get_db() as db:
-        user = db.execute(
-            "SELECT 1 FROM users WHERE username = ?", (username,)
+        # Check if it's a display name first
+        user_row = db.execute(
+            "SELECT username, display_name FROM users WHERE display_name = ? OR username = ?",
+            (username, username)
         ).fetchone()
-        if not user:
+
+        if not user_row:
             raise HTTPException(status_code=404, detail="User not found")
+
+        actual_username = user_row["username"]
+        display_name = user_row["display_name"] or actual_username
+
         rows = db.execute(
             "SELECT date, count FROM reviews WHERE username = ? ORDER BY date",
-            (username,)
+            (actual_username,)
         ).fetchall()
 
     data          = {r["date"]: r["count"] for r in rows}
@@ -235,7 +323,7 @@ def get_heatmap(username: str):
         d -= datetime.timedelta(days=1)
 
     return HTMLResponse(content=render_heatmap(
-        username, json.dumps(data), total_reviews, total_days, max_count, streak
+        display_name, json.dumps(data), total_reviews, total_days, max_count, streak
     ))
 
 

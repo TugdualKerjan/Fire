@@ -1,6 +1,6 @@
 # HEATSHARE
 
-![Hero.png]
+![](image.png)
 
 Be accountable on your anki studies! Install the anki plugin, and share your heatmap with anyone. Fully open-source.
 
